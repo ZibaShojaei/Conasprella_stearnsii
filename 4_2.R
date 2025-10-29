@@ -1,26 +1,3 @@
-##10-26
-##Exclude 2009-only project data
-##removed correlated varaibles Greg said
-##oversample the entire dataset first, create the new balanced dataframe, then do the train/test split and CV.
-## As drew said
-#exclude lat and long
-
-
-# ========= PACKAGES =========
-
-# === Load main R packages for data prep, modeling, and evaluation ===
-# readr, dplyr, tidyr → data loading and cleaning
-# recipes → preprocessing steps for modeling
-# workflows → combine recipe + model into one workflow
-# parsnip → define and train models (like XGBoost)
-# dials, tune → parameter tuning and grid search
-# yardstick → performance metrics (AUC, accuracy, etc.)
-# rsample → data splitting and cross-validation
-# themis → handle class imbalance (oversampling)
-# parallel → speed up tuning with multiple cores
-# tidymodels → loads the full modeling framework conveniently
-
-
 library(readr)
 library(dplyr)
 library(tidyr)
@@ -44,8 +21,8 @@ DATA <- readr::read_csv(
   na = c("NULL", "", "NA")
 )
 
-## Makes a normal data frame and adds a row ID called "source_id".
-### "source_id" gives each record a unique ID — used later to group or split data safely.
+# Makes a normal data frame and adds a row ID called "source_id".
+# "source_id" gives each record a unique ID — used later to group or split data safely.
 
 DATA <- DATA %>%
   select(-any_of("source_id")) %>%
@@ -55,7 +32,6 @@ DATA <- DATA %>%
 DATA <- DATA %>% filter(as.numeric(Year) != 2009)
 
 readr::write_csv(DATA, "Conasprella_stearnsii_1995-2023_oysterD_no2009.csv")
-
 
 # ========= 1) DROP LEAKY TARGET-DERIVED FIELDS =========
 DF_BASE <- DATA %>%
@@ -85,8 +61,6 @@ DF_OS$cone_pa <- factor(DF_OS$cone_pa, levels = c(1,0))
 SPL <- rsample::group_initial_split(DF_OS, prop = 0.75, group = source_id, strata = cone_pa)
 TRN <- training(SPL); TST <- testing(SPL)
 
-
-
 # --- 4) Create preprocessing recipe for model training ---
 # Defines how predictors are cleaned and prepared before modeling.
 
@@ -98,7 +72,6 @@ rec_cls <- recipe(cone_pa ~ ., data = TRN) %>%
   step_novel(all_nominal_predictors()) %>%                      # handle unseen categories in new data
   step_unknown(all_nominal_predictors())                        # handle missing factor levels as "unknown"
 # (No step_dummy) → keeps G1_SAV1 as a single numeric-like factor variable
-
 
 
 # Apply the recipe to clean the training data and make a predictor table for tuning.
@@ -125,7 +98,6 @@ xgb_grid_cls <- dials::grid_latin_hypercube(
   dials::finalize(dials::mtry(), pred_mat),# number of variables tried at each split
   size = 8                                 # total combinations to test
 )
-
 
 # --- 6) Train and tune the XGBoost model ---
 #Choose the best tuning values (highest ROC-AUC) and use them to build the final model
@@ -172,10 +144,7 @@ print(yardstick::conf_mat(eval_tbl, truth = cone_pa, estimate = .pred_class))
 #est ROC-AUC: 0.834
 #Test PR-AUC: 0.774
 #Test Accuracy: 0.699
-
-##Confusion Matrix
-#  TP: 255 TN: 525 FP: 305 FN: 31
-
+#Confusion Matrix: TP: 255 TN: 525 FP: 305 FN: 31
 
 
 # --- 7b) Confusion matrix heatmap (no yardstick::autoplot) ---
@@ -206,7 +175,7 @@ readr::write_csv(dplyr::bind_cols(TST, pred_prob, pred_cls), "xgb_cls_test_predi
 cat("\nSaved: xgb_cls_final.rds, xgb_cls_test_predictions.csv\n") 
 
 
-################### --- R1) Build regression frame (drop leaks + coords + PA) ---#########
+########## --- R1) Build regression frame (drop leaks + coords + PA) ---#########
 # Prepare data for regression model ---
 # Remove presence/absence and coordinate columns,
 # then make sure the abundance variable is numeric for regression.
@@ -306,9 +275,7 @@ print(yardstick::mae( pred_reg, truth = truth, estimate = .pred))
 print(yardstick::rsq( pred_reg, truth = truth, estimate = .pred))
 
 
-##########regression result##########
-#4_2
-
+##########regression result
 #RMSE: 3.14
 #MAE: 0.664
 #R²: 0.698
@@ -319,7 +286,6 @@ print(yardstick::rsq( pred_reg, truth = truth, estimate = .pred))
 saveRDS(fit_reg, "xgb_reg_final.rds")
 readr::write_csv(dplyr::bind_cols(TST_REG, .pred = pred_reg$.pred), "xgb_reg_test_predictions.csv")
 cat("\nSaved: xgb_reg_final.rds, xgb_reg_test_predictions.csv\n")
-
 
 
 ############# ROC and Precision-Recall curves for the final classification model
@@ -334,8 +300,7 @@ pr_curve(eval_tbl, truth = cone_pa, .pred_1, event_level = "first") %>%
   autoplot() + ggplot2::labs(title = "Precision–Recall Curve — XGBoost Classification")
 
 
-
-########## STUDY AREA (buffer around species)
+#### STUDY AREA (buffer around species)
 
 library(sf)
 library(dplyr)
@@ -363,14 +328,7 @@ plot(st_geometry(study_area), col = "lightblue", main = "Study Area")
 plot(pts_sf, add = TRUE, col = "red", pch = 20)
 
 
-######check
-
-nrow(DATA)                            # total rows
-nrow(DATA %>% filter(Depth.B > 0))    # kept
-nrow(DATA %>% filter(!(Depth.B > 0))) # removed
-
-
-#############base map
+####base map
 library(sf)
 library(ggplot2)
 library(ggspatial)
@@ -383,7 +341,7 @@ ggplot() +
   theme_minimal()
 
 
-#####################################prediction map####################
+####prediction map####
 
 #### STEP 2 — Build predictor raster stack by IDW interpolation
 
@@ -395,7 +353,6 @@ DATA <- read_csv("Conasprella_stearnsii_1995-2023_oysterD_no2009.csv",
 study_area <- st_read("study_area_bay_water.shp") |> 
   st_make_valid()
 saveRDS(study_area, "study_area.rds")
-
 
 
 # drop target + coords (keep only predictors)
@@ -444,7 +401,7 @@ print(pred_stack)
 names(pred_stack)
 plot(pred_stack[[1]]); plot(vect(sa_m), add = TRUE, col = NA, lwd = 2)
 
-###### STEP 3 — Convert raster stack into dataframe
+#### STEP 3 — Convert raster stack into dataframe
 
 # load predictor stack
 pred_stack <- rast("predictor_stack.tif")
@@ -459,7 +416,7 @@ glimpse(pred_df)
 saveRDS(pred_df, "predictor_grid_df.rds")
 
 
-############# STEP 4 (fixed) — Add categorical predictors with nearest-neighbor
+#### STEP 4 (fixed) — Add categorical predictors with nearest-neighbor
 
 # reload grid of numeric predictors
 #loads the saved prediction grid with numeric predictors (and coordinates) back into R so you can add more info to it.
@@ -497,7 +454,7 @@ saveRDS(pred_full, "predictor_grid_with_cats.rds")
 head(pred_full)
 
 
-######## --- STEP 5: Predict on the grid using your trained XGBoost model ---
+#### --- STEP 5: Predict on the grid using your trained XGBoost model ---
 
 library(workflows)
 library(recipes)
@@ -587,7 +544,7 @@ ggplot() +
 ##checknames(r_df)
 
 
-# ===########## Binary habitat map (suitable / unsuitable) ===
+#### Binary habitat map (suitable / unsuitable) ===
 library(terra)
 library(ggplot2)
 library(sf)
@@ -641,4 +598,5 @@ ggplot() +
            expand = FALSE) +
   theme_minimal() +
   labs(title = "Binary Habitat Map — XGBoost")
+
 

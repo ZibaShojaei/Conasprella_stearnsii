@@ -502,7 +502,7 @@ writeRaster(r_prob, "xgb_prob_map.tif", overwrite = TRUE)
 
 
 
-##########
+##########Reload prediction data and prepare for raster mapping
 library(terra); library(sf); library(ggplot2); library(ggspatial)
 
 # ---- Correct raster creation and projection ----
@@ -598,5 +598,6 @@ ggplot() +
            expand = FALSE) +
   theme_minimal() +
   labs(title = "Binary Habitat Map — XGBoost")
+
 
 
